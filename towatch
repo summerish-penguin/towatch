@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+
+#------------------------------------------------------------------------------
+# towatch
+# A simple program to manage a to-watch list for youtube videos.
+#
+# DEPENDENCIES: dmenu, mpv, xclip
+#
+# TODO: replace the case statement with getopt;
+#  		THE LIST BRAKES OVER 10 ENTRIES!
+# 		optimize;
+# 		add an option to let the the user choose a location for .towatch;
+# 		maybe add a separate option for comment;
+# 		think of a way to avoid dmenu (it's convenient though when you call
+# 		the program with a keybinding).
+#------------------------------------------------------------------------------
+
+
+# Setting the file path; if file doesn't exist, create it.
+FullPath="$HOME/.towatch"
+[[ -f "$FullPath" ]] || touch "$FullPath"
+
+# If the file is empty, add the heading
+while read; do
+	Check+=("$REPLY")
+done < "$FullPath"
+if [[ -z "${Check[0]}" ]]; then
+	printf "### TO WATCH ###\n" >> "$FullPath"
+fi
+
+
+# Just a better cat
+List () {
+	while read; do
+		ToShow+=("$REPLY")
+	done < "$FullPath"
+	for i in "${ToShow[@]}"; do
+		printf "$i\n"	
+	done
+}
+
+# Takes stdin as the content of a new line, adds a progressive number at the
+# beginning, prompts you whith dmenu for a comment preceded by '#'
+Add () {
+	read Link
+	while read; do
+		Lines+=("$REPLY")
+	done < "$FullPath"
+	[[ -z ${Lines[0]} ]] || LastLine=$(echo "${Lines[-1]}")
+	LastNum=$(echo "${LastLine:0:1}" )
+	if [[ $LastNum != [0-9]* ]]; then
+		NewNum=1
+	else
+		NewNum=$(( $LastNum + 1 ))
+	fi
+
+	# dmenu part. 
+	Comment=$(sleep 1; echo '' | dmenu -p "Add comment: ")
+	printf "$NewNum\t$Link\t# $Comment\n" >> "$FullPath"	
+}
+
+# Removes a line prompting the user for the corresponding number; 
+# The second part of the function is necessary to avoid having a list like e.g.
+# 1, 2, 4, 5 ... after deleting the 3rd entry.
+# TODO: can I do this in a single while read loop?
+Remove () {
+	List
+	read -p "Insert a number for the video you want to remove: " Num
+	while read; do
+		[[ "$REPLY" == [0-9]* ]] || continue
+		Index=${REPLY:0:1}
+		[[ "$Index" != "$Num" ]] || continue
+		echo "$REPLY"	
+ 	done < "$FullPath" > '/tmp/temporary-towatch'
+	mv /tmp/temporary-towatch "$FullPath"
+	# rearrange numbers after deleting a line
+	while read; do	
+		Digits+=("${REPLY:0:1}")
+		TheRest+=("${REPLY:1}")
+	done < "$FullPath"
+	End=$(echo "${#Digits[@]}")
+	printf "### TO WATCH ###\n" > "$FullPath"
+	for (( TheLast = 0; TheLast < "$End"; TheLast++)); {
+		Plus1=$(( TheLast + 1 ))
+		printf '%s%s\n' "$Plus1" "${TheRest[$TheLast]}" >> "$FullPath"
+	}
+}
+
+# Play the video with mpv. This is for youtube links (parameter expansion at
+# line 94, since a youtube link is a 43 character string);
+# I use these mpv flags because my internet connection is not the best.
+Play () {
+	List
+	read -p "Select a video to play: " VidNum
+	while read; do
+		VidToPlay+=("${REPLY:2:43}")
+	done < "$FullPath"	
+	mpv --ytdl-format=22 --override-display-fps=30 "${VidToPlay[$VidNum]}"
+}
+
+# First copy the url from the address, then launch towatch -c with dmenu for
+# example.
+Copy () {
+	#Alternative to this:
+	#xclip -o | sed 's/https:\/\/y/https:\/\/www.y/g' | Add
+	export VideoURL="$(xclip -o)"
+	export OldValue="https://y"
+	export NewValue="https://www.y"
+	echo ${VideoURL//$OldValue/$NewValue} | Add
+}
+
+
+Usage () {
+	printf "A simple program to manage a to-watch list for youtube videos. \
+	\n\nUsage:\ttowatch [options]\n\nOptions:
+	-a\tAdd a video (type in the prompt or pipe the link into towatch -a)
+	-c\tCopy: add the content of xclip selection
+	-l\tShow to-watch list
+	-p\tPlay a video from the list with mpv
+	-r\tRemove a video from the list
+	-h\tDisplay this help message\n"
+	exit 1
+}
+
+# The case statement to manage options. 
+# TODO: learn while getopts (or whatever) instead
+case $1 in
+	"-a") Add;;
+	"-c") Copy;;
+	"-l") List;;
+	"-p") Play;;
+	"-r") Remove;;
+	"-h"|*) Usage;;
+esac
+
+[[ -z $1 ]] && Usage
