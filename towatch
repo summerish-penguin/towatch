@@ -7,12 +7,12 @@
 # DEPENDENCIES: dmenu, mpv, xclip
 #
 # TODO: replace the case statement with getopt;
-#  	THE LIST BRAKES OVER 10 ENTRIES!
-# 	optimize;
-# 	add an option to let the the user choose a location for .towatch;
-# 	maybe add a separate option for comment;
-# 	think of a way to avoid dmenu (it's convenient though when you call
-# 	the program with a keybinding).
+#  		Think about making a list with 10+ entries;
+# 		optimize;
+# 		add an option to let the the user choose a location for .towatch;
+# 		maybe add a separate option for comment;
+# 		think of a way to avoid dmenu (it's convenient though when you call
+# 		the program with a keybinding).
 #------------------------------------------------------------------------------
 
 
@@ -109,12 +109,32 @@ Copy () {
 	echo ${VideoURL//$OldValue/$NewValue} | Add
 }
 
+Edit () {
+	List
+	read -p "Select a comment to edit: " CommentNr
+	read -p "New comment: " NewComment
+ 	while read; do
+		ColumnComm+=("${REPLY:45}")
+		NotComment+=("${REPLY:0:45}")
+		Entries+=("$REPLY")
+	done < "$FullPath"
+	printf "### TO WATCH ###\n" > "$FullPath"
+	for (( Nr=1; Nr < "$CommentNr"; Nr++ )) {
+		printf "${NotComment[$Nr]}${ColumnComm[$Nr]}\n" >> "$FullPath"
+	}
+	printf "${NotComment[$CommentNr]}$NewComment\n" >> "$FullPath"
+	for (( Num="$CommentNr"+1; Num <= "${#Entries[@]}"; Num++ )) {
+		printf "${NotComment[$Num]}${ColumnComm[$Num]}\n" >> "$FullPath"
+	}
+}
+
 
 Usage () {
-	printf "A simple program to manage a to-watch list for youtube videos. \
+	printf "A simple program to manage a to-watch list for videos. \
 	\n\nUsage:\ttowatch [options]\n\nOptions:
 	-a\tAdd a video (type in the prompt or pipe the link into towatch -a)
 	-c\tCopy: add the content of xclip selection
+	-e\tEdit the comment to an entry
 	-l\tShow to-watch list
 	-p\tPlay a video from the list with mpv
 	-r\tRemove a video from the list
@@ -127,6 +147,7 @@ Usage () {
 case $1 in
 	"-a") Add;;
 	"-c") Copy;;
+	"-e") Edit;;
 	"-l") List;;
 	"-p") Play;;
 	"-r") Remove;;
