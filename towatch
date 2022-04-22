@@ -39,8 +39,8 @@ List () {
 	done
 }
 
-# Takes stdin as the content of a new line, adds a progressive number at the
-# beginning, prompts you whith dmenu for a comment preceded by '#'
+# Takes input as the content of a new line, adds a progressive number at the
+# beginning, prompts you with dmenu for a comment preceded by '#'
 Add () {
 	read Link
 	while read; do
